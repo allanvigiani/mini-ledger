@@ -34,6 +34,14 @@ export class AccountsController {
     };
   }
 
+  @Get('/:id/balance')
+  async findBalance(@Param('id') id: string) {
+    const balance = await this.accountsService.findBalanceAndCreditLimit(id);
+    return {
+      data: balance,
+    };
+  }
+
   @Get('/:id')
   async findOne(@Param('id') id: string) {
     const account = await this.accountsService.findOne(id);

@@ -5,6 +5,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
+import { BalanceDto } from './dto/balance.dto';
 import { Account } from '@prisma/client';
 
 @Injectable()
@@ -65,5 +66,18 @@ export class AccountsService {
     }
 
     return account;
+  }
+
+  async findBalanceAndCreditLimit(id: string): Promise<BalanceDto> {
+    const balance = await this.prisma.account.findUnique({
+      where: { id },
+      select: { balance: true, credit_limit: true },
+    });
+
+    if (!balance) {
+      throw new NotFoundException('Conta não encontrada.');
+    }
+
+    return balance;
   }
 }
