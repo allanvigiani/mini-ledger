@@ -8,7 +8,6 @@ import {
   Logger,
   OnModuleInit,
   OnModuleDestroy,
-  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { LedgerStatus } from '@prisma/client';
@@ -61,14 +60,53 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
 
       const message = channel ? await channel.get('log.pubsub') : undefined;
 
-      if (message) {
+      if (message && channel) {
         const content = message.content.toString();
-        const logData = JSON.parse(content) as LogMessage;
+        const logData = JSON.parse(content);
 
-        await this.saveLedgerLog(logData);
+        const attempts = message.properties.headers?.attempts || 0;
+        const maxAttempts = 3;
 
-        if (channel) {
+        this.logger.log(
+          `Processando mensagem para movement_id: ${logData.movement_id} na tentativa ${attempts + 1}/${maxAttempts}`,
+        );
+
+        try {
+          await this.saveLedgerLog(logData);
+
           channel.ack(message);
+          this.logger.log(
+            `Log salvo com sucesso para movement_id: ${logData.movement_id}`,
+          );
+        } catch (error) {
+          this.logger.error(
+            `Erro ao salvar log para movement_id ${logData.movement_id} na tentativa ${attempts + 1}/${maxAttempts}:`,
+            error,
+          );
+
+          if (attempts < maxAttempts - 1) {
+            this.logger.log(
+              `Reenviando mensagem para tentativa ${attempts + 2}/${maxAttempts}`,
+            );
+
+            // Incrementar contador de tentativas e publica novamente na fila
+            const newHeaders = {
+              ...message.properties.headers,
+              attempts: attempts + 1,
+            };
+
+            await channel.publish('', 'log.pubsub', message.content, {
+              headers: newHeaders,
+              persistent: true,
+            });
+
+            channel.ack(message);
+          } else {
+            this.logger.error(
+              `Esgotadas as ${maxAttempts} tentativas para movement_id: ${logData.movement_id}. Rejeitando mensagem.`,
+            );
+            channel.nack(message, false, false);
+          }
         }
       }
     } catch (error) {
@@ -91,59 +129,24 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async saveLedgerLog(
-    logData: LogMessage,
-    attempt: number = 1,
-  ): Promise<void> {
-    const maxAttempts = 3;
+  private async saveLedgerLog(logData: LogMessage): Promise<void> {
+    const existingLog = await this.prisma.ledgerLog.findUnique({
+      where: { movement_id: logData.movement_id },
+    });
 
-    try {
-      const existingLog = await this.prisma.ledgerLog.findUnique({
-        where: { movement_id: logData.movement_id },
-      });
-
-      if (existingLog) {
-        this.logger.warn(
-          `Log já existe para movement_id: ${logData.movement_id}. Parando inserção.`,
-        );
-        return;
-      }
-
-      await this.prisma.ledgerLog.create({
-        data: {
-          movement_id: logData.movement_id,
-          status: logData.status,
-          fail_reason: logData.fail_reason,
-        },
-      });
-
-      this.logger.log(
-        `Log salvo com sucesso para movement_id: ${logData.movement_id}`,
+    if (existingLog) {
+      this.logger.warn(
+        `Log já existe para movement_id: ${logData.movement_id}`,
       );
-    } catch (error) {
-      this.logger.error(
-        `Erro ao salvar log para movement_id ${logData.movement_id} na tentativa ${attempt}/${maxAttempts}:`,
-        error,
-      );
-
-      if (attempt < maxAttempts) {
-        this.logger.log(
-          `Tentando novamente salvar log para movement_id: ${logData.movement_id} na tentativa ${attempt + 1}/${maxAttempts}`,
-        );
-
-        await this.delay(1000 * attempt);
-
-        return await this.saveLedgerLog(logData, attempt + 1);
-      } else {
-        this.logger.error(
-          `Falha ao salvar log após ${maxAttempts} tentativas para movement_id: ${logData.movement_id}`,
-        );
-        throw new NotFoundException('Erro ao processar logs. ' + error);
-      }
+      return;
     }
-  }
 
-  private delay(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    await this.prisma.ledgerLog.create({
+      data: {
+        movement_id: logData.movement_id,
+        status: logData.status,
+        fail_reason: logData.fail_reason,
+      },
+    });
   }
 }

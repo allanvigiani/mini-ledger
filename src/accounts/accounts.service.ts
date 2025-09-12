@@ -2,6 +2,7 @@ import {
   Injectable,
   ConflictException,
   NotFoundException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateAccountDto } from './dto/create-account.dto';
@@ -10,15 +11,22 @@ import { Account } from '@prisma/client';
 
 @Injectable()
 export class AccountsService {
+  private readonly logger = new Logger(AccountsService.name);
   constructor(private prisma: PrismaService) {}
 
   async create(createAccountDto: CreateAccountDto): Promise<Account> {
     try {
+      this.logger.log(
+        `Processando criação de conta para o email: ${createAccountDto.email}`,
+      );
       const existingEmailAccount = await this.prisma.account.findUnique({
         where: { email: createAccountDto.email },
       });
 
       if (existingEmailAccount) {
+        this.logger.warn(
+          `Tentativa de criação de conta com EMAIL JÁ EXISTENTE: ${createAccountDto.email}`,
+        );
         throw new ConflictException(
           'Email já está cadastrado em nosso sistema.',
         );
@@ -29,12 +37,15 @@ export class AccountsService {
       });
 
       if (existingDocumentAccount) {
+        this.logger.warn(
+          `Tentativa de criação de conta com DOCUMENTO JÁ EXISTENTE: ${createAccountDto.document}`,
+        );
         throw new ConflictException(
           'Documento já está cadastrado em nosso sistema.',
         );
       }
 
-      return await this.prisma.account.create({
+      const result = await this.prisma.account.create({
         data: {
           name: createAccountDto.name,
           email: createAccountDto.email,
@@ -42,6 +53,12 @@ export class AccountsService {
           balance: createAccountDto?.balance ?? 0,
         },
       });
+
+      this.logger.log(
+        `Conta criada com SUCESSO (${result.id}}) para o email: ${createAccountDto.email}`,
+      );
+
+      return result;
     } catch (error) {
       if (error instanceof ConflictException) {
         throw error;

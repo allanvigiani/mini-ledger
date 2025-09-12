@@ -4,7 +4,6 @@ import {
   Post,
   Body,
   Param,
-  HttpStatus,
   ValidationPipe,
   UsePipes,
 } from '@nestjs/common';

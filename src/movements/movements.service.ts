@@ -3,6 +3,7 @@ import {
   ConflictException,
   NotFoundException,
   BadRequestException,
+  Logger,
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
@@ -12,18 +13,28 @@ import { publishToQueue } from '../rabbitmq/rabbitmq.publisher';
 
 @Injectable()
 export class MovementsService {
+  private readonly logger = new Logger(MovementsService.name);
   constructor(private prisma: PrismaService) {}
 
   async create(createMovementDto: CreateMovementDto): Promise<Movement> {
+    this.logger.log(
+      `Processando criação de movimentação para a conta de ID: ${createMovementDto.account_id}`,
+    );
     const account = await this.prisma.account.findUnique({
       where: { id: createMovementDto.account_id },
     });
 
     if (!account) {
+      this.logger.warn(
+        `Conta não encontrada para ID: ${createMovementDto.account_id}`,
+      );
       throw new NotFoundException('Conta não encontrada.');
     }
 
     if (createMovementDto.type === MovementType.DEBIT) {
+      this.logger.log(
+        `Verificando saldo disponível para DÉBITO na conta ID: ${createMovementDto.account_id}`,
+      );
       const availableBalance = account.balance + account.credit_limit;
 
       if (createMovementDto.amount > availableBalance) {
@@ -36,6 +47,10 @@ export class MovementsService {
             description: createMovementDto.description,
           },
         });
+
+        this.logger.log(
+          `Movimentação bloqueada por LIMITE INSUFICIENTE para a conta ID: ${createMovementDto.account_id}. Enviando informações para a fila de Logs.`,
+        );
 
         const otherMessage = {
           movement_id: otherMovement.id,
@@ -73,6 +88,10 @@ export class MovementsService {
 
         return movement;
       });
+
+      this.logger.log(
+        `Movimentação CONCLUÍDA para a conta ID: ${createMovementDto.account_id}. Enviando informações para a fila de Logs.`,
+      );
 
       const message = {
         movement_id: result.id,
