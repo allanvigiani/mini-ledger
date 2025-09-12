@@ -5,7 +5,7 @@ Para facilitar os testes, disponibilizamos uma collection completa para importar
 ## 📁 Download da API
 
 Para facilitar os testes, aqui está a collection completa para importar no Postman.
-**📂 Arquivo:** [`collection.json`](./collection.json)
+**📂 Arquivo:** [`collection.json`](./arquivos/MINILEDGER.postman_collection.json)
 
 ## 🏗️ Arquitetura
 
