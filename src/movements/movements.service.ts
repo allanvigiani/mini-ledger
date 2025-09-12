@@ -6,6 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from '../common/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
+import { AccountMovementsDto } from './dto/account-movements.dto';
 import { Movement, MovementType } from '@prisma/client';
 
 @Injectable()
@@ -65,34 +66,28 @@ export class MovementsService {
     }
   }
 
-  async findByAccountId(accountId: string): Promise<Movement[]> {
+  async findByAccountId(accountId: string): Promise<AccountMovementsDto> {
     const account = await this.prisma.account.findUnique({
       where: { id: accountId },
+      select: {
+        id: true,
+        name: true,
+      },
     });
 
     if (!account) {
       throw new NotFoundException('Conta não encontrada.');
     }
 
-    // Melhorar forma de retorno {account_id, name, movements: []}
     const movements = await this.prisma.movement.findMany({
       where: { account_id: accountId },
       orderBy: { created_at: 'desc' },
-      include: {
-        account: {
-          select: {
-            name: true,
-          },
-        },
-      },
     });
 
-    if (movements.length === 0) {
-      throw new NotFoundException(
-        'Nenhuma movimentação encontrada para esta conta.',
-      );
-    }
-
-    return movements;
+    return {
+      account_id: account.id,
+      name: account.name,
+      movements: movements,
+    };
   }
 }
