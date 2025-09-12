@@ -37,7 +37,7 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
   private startConsumer() {
     this.intervalId = setInterval(() => {
       void this.consumeLogQueue();
-    }, 10000); // 10 segundos
+    }, 10000);
   }
 
   private stopConsumer() {
@@ -65,7 +65,7 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
         const content = message.content.toString();
         const logData = JSON.parse(content) as LogMessage;
 
-        await this.saveLadgerLog(logData);
+        await this.saveLedgerLog(logData);
 
         if (channel) {
           channel.ack(message);
@@ -91,13 +91,21 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
     }
   }
 
-  private async saveLadgerLog(logData: LogMessage) {
+  private async saveLedgerLog(
+    logData: LogMessage,
+    attempt: number = 1,
+  ): Promise<void> {
+    const maxAttempts = 3;
+
     try {
       const existingLog = await this.prisma.ledgerLog.findUnique({
         where: { movement_id: logData.movement_id },
       });
 
       if (existingLog) {
+        this.logger.warn(
+          `Log já existe para movement_id: ${logData.movement_id}. Parando inserção.`,
+        );
         return;
       }
 
@@ -108,8 +116,34 @@ export class RabbitMQConsumerService implements OnModuleInit, OnModuleDestroy {
           fail_reason: logData.fail_reason,
         },
       });
+
+      this.logger.log(
+        `Log salvo com sucesso para movement_id: ${logData.movement_id}`,
+      );
     } catch (error) {
-      throw new NotFoundException('Erro ao processar logs. ' + error);
+      this.logger.error(
+        `Erro ao salvar log para movement_id ${logData.movement_id} na tentativa ${attempt}/${maxAttempts}:`,
+        error,
+      );
+
+      if (attempt < maxAttempts) {
+        this.logger.log(
+          `Tentando novamente salvar log para movement_id: ${logData.movement_id} na tentativa ${attempt + 1}/${maxAttempts}`,
+        );
+
+        await this.delay(1000 * attempt);
+
+        return await this.saveLedgerLog(logData, attempt + 1);
+      } else {
+        this.logger.error(
+          `Falha ao salvar log após ${maxAttempts} tentativas para movement_id: ${logData.movement_id}`,
+        );
+        throw new NotFoundException('Erro ao processar logs. ' + error);
+      }
     }
+  }
+
+  private delay(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 }
