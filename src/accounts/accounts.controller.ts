@@ -20,9 +20,7 @@ export class AccountsController {
   async create(@Body() createAccountDto: CreateAccountDto) {
     const account = await this.accountsService.create(createAccountDto);
     return {
-      message: 'Conta criada com sucesso',
       data: account,
-      statusCode: HttpStatus.CREATED,
     };
   }
 

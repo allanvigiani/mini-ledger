@@ -8,6 +8,7 @@ import { PrismaService } from '../common/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { AccountMovementsDto } from './dto/account-movements.dto';
 import { Movement, MovementType } from '@prisma/client';
+import { publishToQueue } from '../common/rabbitmq.publisher';
 
 @Injectable()
 export class MovementsService {
@@ -58,6 +59,8 @@ export class MovementsService {
 
         return movement;
       });
+
+      await publishToQueue('log.pubsub', result);
 
       return result;
     } catch (error) {
