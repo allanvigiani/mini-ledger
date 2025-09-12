@@ -8,7 +8,7 @@ import { PrismaService } from '../common/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { AccountMovementsDto } from './dto/account-movements.dto';
 import { Movement, MovementType, LedgerStatus } from '@prisma/client';
-import { publishToQueue } from '../common/rabbitmq.publisher';
+import { publishToQueue } from '../rabbitmq/rabbitmq.publisher';
 
 @Injectable()
 export class MovementsService {
@@ -100,8 +100,7 @@ export class MovementsService {
       };
       await publishToQueue('log.pubsub', failedMessage);
 
-      console.error('Erro ao criar movimentação:', error);
-      throw new ConflictException('Erro ao processar movimentação');
+      throw new ConflictException('Erro ao processar movimentação. ' + error);
     }
   }
 
