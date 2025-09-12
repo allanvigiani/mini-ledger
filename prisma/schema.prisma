@@ -26,6 +26,7 @@ model Movement {
   account_id  String       @db.VarChar(255)
   amount      Float
   type        MovementType
+  status      LedgerStatus
   description String?
   created_at  DateTime     @default(now()) @db.Timestamp(0)
 
@@ -33,6 +34,7 @@ model Movement {
   ledger_log LedgerLog?
 
   @@index([account_id])
+  @@index([status])
   @@map("movements")
 }
 
@@ -43,7 +45,7 @@ model LedgerLog {
   fail_reason  String?
   processed_at DateTime     @default(now()) @db.Timestamp(0)
 
-  movement  Movement @relation(fields: [movement_id], references: [id], onDelete: Cascade)
+  movement Movement @relation(fields: [movement_id], references: [id], onDelete: Cascade)
 
   @@index([movement_id])
   @@index([status])
@@ -59,5 +61,7 @@ enum LedgerStatus {
   PROCESSED
   FAILED
   PENDING
+  APPROVED
+  BLOCKED
   OTHER
 }

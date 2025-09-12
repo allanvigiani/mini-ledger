@@ -7,7 +7,7 @@ import {
 import { PrismaService } from '../common/prisma.service';
 import { CreateMovementDto } from './dto/create-movement.dto';
 import { AccountMovementsDto } from './dto/account-movements.dto';
-import { Movement, MovementType } from '@prisma/client';
+import { Movement, MovementType, LedgerStatus } from '@prisma/client';
 import { publishToQueue } from '../common/rabbitmq.publisher';
 
 @Injectable()
@@ -27,6 +27,22 @@ export class MovementsService {
       const availableBalance = account.balance + account.credit_limit;
 
       if (createMovementDto.amount > availableBalance) {
+        const otherMovement = await this.prisma.movement.create({
+          data: {
+            account_id: createMovementDto.account_id,
+            amount: createMovementDto.amount,
+            type: createMovementDto.type,
+            status: LedgerStatus.BLOCKED,
+            description: createMovementDto.description,
+          },
+        });
+
+        const otherMessage = {
+          movement_id: otherMovement.id,
+          status: LedgerStatus.BLOCKED,
+          fail_reason: 'Transação bloqueada, limite insuficiente.',
+        };
+        await publishToQueue('log.pubsub', otherMessage);
         throw new BadRequestException(
           `Transação bloqueada, limite insuficiente.`,
         );
@@ -45,10 +61,8 @@ export class MovementsService {
             account_id: createMovementDto.account_id,
             amount: createMovementDto.amount,
             type: createMovementDto.type,
+            status: LedgerStatus.APPROVED,
             description: createMovementDto.description,
-          },
-          include: {
-            account: true,
           },
         });
 
@@ -60,11 +74,33 @@ export class MovementsService {
         return movement;
       });
 
-      await publishToQueue('log.pubsub', result);
+      const message = {
+        movement_id: result.id,
+        status: LedgerStatus.PROCESSED,
+      };
+
+      await publishToQueue('log.pubsub', message);
 
       return result;
     } catch (error) {
-      console.error('Erro ao criar movimento:', error);
+      const failedMovement = await this.prisma.movement.create({
+        data: {
+          account_id: createMovementDto.account_id,
+          amount: createMovementDto.amount,
+          type: createMovementDto.type,
+          status: LedgerStatus.FAILED,
+          description: createMovementDto.description,
+        },
+      });
+
+      const failedMessage = {
+        movement_id: failedMovement.id,
+        status: LedgerStatus.FAILED,
+        fail_reason: 'Transação falhou. Erro interno',
+      };
+      await publishToQueue('log.pubsub', failedMessage);
+
+      console.error('Erro ao criar movimentação:', error);
       throw new ConflictException('Erro ao processar movimentação');
     }
   }
