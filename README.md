@@ -4,8 +4,8 @@
 
 Para facilitar os testes, aqui está a collection completa para importar no Postman.
 **📂 Arquivo:** 
-- [📥 **Download Collection**](./arquivos/MINILEDGER.postman_collection.json?raw=true) (Clique para baixar)
-- [👁️ **Visualizar**](./arquivos/MINILEDGER.postman_collection.json) (Ver conteúdo)
+- [**Download Collection**](./arquivos/MINILEDGER.postman_collection.json?raw=true) (Clique para baixar)
+- [**Visualizar**](./arquivos/MINILEDGER.postman_collection.json) (Ver conteúdo)
 
 ## 🏗️ Arquitetura
 
@@ -30,6 +30,7 @@ cd mini-ledger
 
 2. **Execute o projeto com Docker Compose**
 ```bash
+sudo npm run build
 sudo docker-compose up --build
 ```
 
@@ -248,6 +249,16 @@ curl -X GET http://localhost:3000/movements/account/{ACCOUNT_ID}
 - **Docker**: Containerização
 - **Class Validator**: Validação de dados
 - **ESLint + Prettier**: Qualidade e formatação de código
+
+## 🧪 Testes Unitários com Jest
+
+```bash
+npm test
+```
+
+<p align="center">
+  <img src="./arquivos/jest_test.jpg" alt="Testes Unitários executados com sucesso" width="800">
+</p>
 
 ## 📦 Estrutura do Projeto
 
