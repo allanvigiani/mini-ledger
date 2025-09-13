@@ -1,11 +1,11 @@
-# Mi## 📁 Collection da API
-
-Para facilitar os testes, disponibilizamos uma collection completa para importar no Postman, Insomnia ou Thunder Client.
+# Mini Ledger
 
 ## 📁 Download da API
 
 Para facilitar os testes, aqui está a collection completa para importar no Postman.
-**📂 Arquivo:** [`collection.json`](./arquivos/MINILEDGER.postman_collection.json)
+**📂 Arquivo:** 
+- [📥 **Download Collection**](./arquivos/MINILEDGER.postman_collection.json?raw=true) (Clique para baixar)
+- [👁️ **Visualizar**](./arquivos/MINILEDGER.postman_collection.json) (Ver conteúdo)
 
 ## 🏗️ Arquitetura
 
@@ -181,7 +181,13 @@ sudo docker-compose logs -f app | grep "Processando mensagem"
 - Uma conta pode ter várias movimentações
 - Cada movimentação pode ter um log de auditoria
 
-![Diagrama de Relacionamento]('./arquivos/draw.png')
+### 📊 Diagrama de Relacionamento
+
+<p align="center">
+  <img src="./arquivos/draw.jpg" alt="Diagrama de Relacionamento do Banco de Dados" width="800">
+</p>
+
+*Diagrama mostrando a estrutura e relacionamentos entre as tabelas do sistema*
 
 ## 🧪 Testando o Sistema
 
